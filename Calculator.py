@@ -546,6 +546,9 @@ if mode == "Root Finding (Comparison)":
 # -------------------------
 # Lagrange Mode
 # -------------------------
+# -------------------------
+# Lagrange Mode
+# -------------------------
 else:
     st.header("📐 Lagrange Interpolation")
 
@@ -553,6 +556,8 @@ else:
     with left:
         paste = st.text_area("Paste CSV rows (x,y) or leave blank")
         upload = st.file_uploader("Or upload CSV file (columns: x,y)", type=["csv"])
+
+        # Load CSV / Paste data into session
         if upload:
             try:
                 df_csv = pd.read_csv(upload)
@@ -581,8 +586,16 @@ else:
                 st.error(f"Parse error: {e}")
 
         st.markdown("---")
-        x_manual = st.text_input("X points (comma separated)", value="5,6,9,11")
-        y_manual = st.text_input("Y points (comma separated)", value="12,13,14,16")
+        # Use session state as default in manual inputs
+        if "lag_data" in st.session_state:
+            default_x = ",".join(str(x) for x in st.session_state["lag_data"]["x"])
+            default_y = ",".join(str(y) for y in st.session_state["lag_data"]["y"])
+        else:
+            default_x = "5,6,9,11"
+            default_y = "12,13,14,16"
+
+        x_manual = st.text_input("X points (comma separated)", value=default_x)
+        y_manual = st.text_input("Y points (comma separated)", value=default_y)
         target_x = st.number_input("Target X", value=10.0)
         calc_btn = st.button("Calculate Interpolation")
 
@@ -590,16 +603,17 @@ else:
         st.markdown("Preview / Result")
         if "lag_data" in st.session_state and st.session_state["lag_data"]:
             data = st.session_state["lag_data"]
-            if isinstance(data, dict) and "x" in data and "y" in data:
-                pts_df = pd.DataFrame({"x": data["x"], "y": data["y"]})
-                st.table(pts_df)
+            pts_df = pd.DataFrame({"x": data["x"], "y": data["y"]})
+            st.table(pts_df)
         else:
             st.info("No data loaded yet. Paste, upload, or use manual input then Calculate.")
 
     if calc_btn:
         try:
+            # Take manual input, fallback to session state
             xs = [float(k.strip()) for k in x_manual.split(",") if k.strip()]
             ys = [float(k.strip()) for k in y_manual.split(",") if k.strip()]
+
             if len(xs) != len(ys):
                 st.error("X and Y must have same length.")
             elif len(xs) < 2:
@@ -614,20 +628,21 @@ else:
         except Exception as e:
             st.error(f"Input error: {e}")
 
+    # Plot Lagrange curve
     if "lag_data" in st.session_state and st.session_state["lag_data"]:
         dd = st.session_state["lag_data"]
-        if isinstance(dd, dict) and "x" in dd and "y" in dd:
-            xs = dd["x"]; ys = dd["y"]
-            x_s = np.linspace(min(xs), max(xs), 400)
-            y_s = [lagrange_interpolate(xs, ys, xv) for xv in x_s]
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=x_s, y=y_s, mode="lines", name="Lagrange curve"))
-            fig.add_trace(go.Scatter(x=xs, y=ys, mode="markers", name="Data points"))
-            st.plotly_chart(fig, use_container_width=True)
-            pts_df = pd.DataFrame({"x": xs, "y": ys})
-            csv_bytes = df_to_csv_bytes(pts_df)
-            href = download_link_bytes(csv_bytes, "lagrange_points.csv", "Download points CSV")
-            st.markdown(href, unsafe_allow_html=True)
+        xs = dd["x"]; ys = dd["y"]
+        x_s = np.linspace(min(xs), max(xs), 400)
+        y_s = [lagrange_interpolate(xs, ys, xv) for xv in x_s]
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x_s, y=y_s, mode="lines", name="Lagrange curve"))
+        fig.add_trace(go.Scatter(x=xs, y=ys, mode="markers", name="Data points"))
+        st.plotly_chart(fig, use_container_width=True)
+        pts_df = pd.DataFrame({"x": xs, "y": ys})
+        csv_bytes = df_to_csv_bytes(pts_df)
+        href = download_link_bytes(csv_bytes, "lagrange_points.csv", "Download points CSV")
+        st.markdown(href, unsafe_allow_html=True)
 
 st.markdown("---")
 st.caption("NumComp Pro")
+
